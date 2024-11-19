@@ -20,7 +20,7 @@ def _encode_string_as_resp2(string: str) -> bytes:
 def _decode_resp_to_string(resp_string: bytes) -> str:
     string_data: str = resp_string.decode(encoding="utf-8")
     # to exclude the begining special char
-    stripped_str: str = string_data[1:-1]
+    stripped_str: str = str(string_data[1:])
     return stripped_str
 
 
@@ -29,17 +29,18 @@ def _ping_pong_implementation(data: bytes) -> bytes:
 
 
 def _receive_delimited_message(sock: socket.socket, delimiter=b'\n') -> None:
-    data: bytes = b''
+    whole_data: bytes = b''
     while True:
-        part = sock.recv(1024)
-        data += part
+        part: bytes = sock.recv(1024)
+        whole_data += part
 
-        for each_cmd in data.split(delimiter):
+        for each_cmd in whole_data.split(delimiter):
             # Generating the response data
             # Preserving the byte ending \n which is lost in split()
             respsonse_data: bytes = _redis_cmd_router(
                 data=each_cmd + b"\n"
                 )
+            print(f"respsonse_data = {respsonse_data}")
             # Write the same data back
             sock.sendall(respsonse_data)
 
