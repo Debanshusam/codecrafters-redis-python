@@ -2,12 +2,19 @@ import socket  # noqa: F401
 # from loguru import logger
 
 
-def encode_string_as_resp(string: str) -> bytes:
-    """Encodes a string into a RESP string."""
+def encode_string_as_resp2(string: str) -> bytes:
+    """Encodes a string into a RESP2 string.
 
-    byte_count: int = len(string.encode('utf-8'))
-    resp_string: str = f"{byte_count}\r\n{string}\r\n"
-    return resp_string.encode('utf-8')
+  Args:
+    string: The string to encode.
+
+  Returns:
+    The encoded RESP2 string.
+  """
+
+    byte_count: int = len(string.encode(encoding='utf-8'))
+    resp_string: str = f"+{byte_count}\r\n{string}\r\n"
+    return resp_string.encode(encoding='utf-8')
 
 
 def decode_resp_to_string(resp_string: bytes) -> str:
@@ -16,7 +23,7 @@ def decode_resp_to_string(resp_string: bytes) -> str:
 
 
 def ping_pong_implementation(data: bytes) -> bytes:
-    return encode_string_as_resp(string="PONG")
+    return encode_string_as_resp2(string="PONG")
 
 
 def redis_cmd_router(data: bytes) -> bytes:
