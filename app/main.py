@@ -19,7 +19,9 @@ def _encode_string_as_resp2(string: str) -> bytes:
 
 def _decode_resp_to_string(resp_string: bytes) -> str:
     string_data: str = resp_string.decode(encoding="utf-8")
-    return string_data
+    # to exclude the begining special char
+    stripped_str: str = string_data[1:-1]
+    return stripped_str
 
 
 def _ping_pong_implementation(data: bytes) -> bytes:
