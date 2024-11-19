@@ -35,8 +35,12 @@ def _receive_delimited_message(sock: socket.socket, delimiter=b'\n') -> None:
         data += part
 
         for each_cmd in data.split(delimiter):
+            # Generating the response data
+            # Preserving the byte ending \n which is lost in split()
+            respsonse_data: bytes = _redis_cmd_router(
+                data=each_cmd + b"\n"
+                )
             # Write the same data back
-            respsonse_data: bytes = _redis_cmd_router(data=each_cmd)
             sock.sendall(respsonse_data)
 
 
