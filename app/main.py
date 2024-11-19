@@ -11,9 +11,9 @@ def encode_string_as_resp2(string: str) -> bytes:
   Returns:
     The encoded RESP2 string.
   """
-
     byte_count: int = len(string.encode(encoding='utf-8'))
-    resp_string: str = f"+{byte_count}\r\n{string}\r\n"
+    # resp_string: str = f"+{byte_count}\r\n{string}\r\n"
+    resp_string: str = f"+{string}\r\n"
     return resp_string.encode(encoding='utf-8')
 
 
