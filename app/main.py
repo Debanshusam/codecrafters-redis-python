@@ -2,7 +2,7 @@ import socket  # noqa: F401
 # from loguru import logger
 
 
-def encode_string_as_resp2(string: str) -> bytes:
+def _encode_string_as_resp2(string: str) -> bytes:
     """Encodes a string into a RESP2 string.
 
   Args:
@@ -11,28 +11,40 @@ def encode_string_as_resp2(string: str) -> bytes:
   Returns:
     The encoded RESP2 string.
   """
-    byte_count: int = len(string.encode(encoding='utf-8'))
+    # byte_count: int = len(string.encode(encoding='utf-8'))
     # resp_string: str = f"+{byte_count}\r\n{string}\r\n"
     resp_string: str = f"+{string}\r\n"
     return resp_string.encode(encoding='utf-8')
 
 
-def decode_resp_to_string(resp_string: bytes) -> str:
+def _decode_resp_to_string(resp_string: bytes) -> str:
     string_data: str = resp_string.decode(encoding="utf-8")
     return string_data
 
 
-def ping_pong_implementation(data: bytes) -> bytes:
-    return encode_string_as_resp2(string="PONG")
+def _ping_pong_implementation(data: bytes) -> bytes:
+    return _encode_string_as_resp2(string="PONG")
 
 
-def redis_cmd_router(data: bytes) -> bytes:
+def _receive_delimited_message(sock: socket.socket, delimiter=b'\n') -> None:
+    data: bytes = b''
+    while True:
+        part = sock.recv(1024)
+        data += part
+
+        for each_cmd in data.split(delimiter):
+            # Write the same data back
+            respsonse_data: bytes = _redis_cmd_router(data=each_cmd)
+            sock.sendall(respsonse_data)
+
+
+def _redis_cmd_router(data: bytes) -> bytes:
 
     # PING-PONG cmd
-    text_data: str = decode_resp_to_string(resp_string=data)
-    if "PING" in text_data:
-        print("PING Command detected")
-        return ping_pong_implementation(data=data)
+    text_data: str = _decode_resp_to_string(resp_string=data)
+    if "ping" in text_data.lower():
+        print(f"PING Command detected: {text_data}")
+        return _ping_pong_implementation(data=data)
     else:
         # returning back the input data
         return data
@@ -62,11 +74,12 @@ def main():
         print(f"accepted connection from {socket_address}")
 
         # Read data
-        data: bytes = connection.recv(1024)
+        # data: bytes = connection.recv(1024)
 
-        # Write the same data back
-        respsonse_data: bytes = redis_cmd_router(data=data)
-        connection.sendall(respsonse_data)
+        _receive_delimited_message(
+            sock=connection,
+            delimiter=b"\n"
+        )
 
 
 if __name__ == "__main__":
