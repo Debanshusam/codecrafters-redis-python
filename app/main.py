@@ -1,19 +1,16 @@
-import socket  # noqa: F401
-# from loguru import logger
 import logging as logger
+import asyncio
 
 
 def _encode_string_as_resp2(string: str) -> bytes:
     """Encodes a string into a RESP2 string.
 
-  Args:
-    string: The string to encode.
+    Args:
+        string: The string to encode.
 
-  Returns:
-    The encoded RESP2 string.
-  """
-    # byte_count: int = len(string.encode(encoding='utf-8'))
-    # resp_string: str = f"+{byte_count}\r\n{string}\r\n"
+    Returns:
+        The encoded RESP2 string.
+    """
     resp_string: str = f"+{string}\r\n"
     return resp_string.encode(encoding='utf-8')
 
@@ -72,31 +69,37 @@ def _decode_resp_to_string(resp_string: bytes) -> str | list[str]:
 
 
 def _ping_implementation() -> str:
-    # _repsonse: bytes = _encode_string_as_resp2(string="PONG")
-
     _repsonse: str = "PONG"
-
     return _repsonse
 
 
 def _redis_cmd_router(data: str) -> str:
-
-    # PING-PONG cmd
-    # text_data: str = _decode_resp_to_string(resp_string=data)
     text_data: str = data
 
     if "ping" in text_data.lower():
         logger.info(f"PING Command detected: {text_data}")
         return _ping_implementation()
     else:
-        # returning back the input data
-        # return _encode_string_as_resp2(string=data)
         return data
 
 
-def _receive_client_input(sock_conn: socket.socket) -> None:
+async def _ready_client_response(writer: asyncio.StreamWriter, client_input_cmd: str | list[str]) -> None:
+    response_data: str = ""
+    if isinstance(client_input_cmd, str):
+        response_data = _redis_cmd_router(client_input_cmd)
+        writer.write(_encode_string_as_resp2(response_data))
+        await writer.drain()
+    else:
+        for cmd in client_input_cmd:
+            response_data = _redis_cmd_router(cmd)
+            logger.debug(f"response_data = {response_data}")
+            writer.write(_encode_string_as_resp2(response_data))
+            await writer.drain()
+
+
+async def _receive_client_input(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     while True:
-        buffered_data: bytes = sock_conn.recv(1024)
+        buffered_data: bytes = await reader.read(1024)
         logger.debug(f"buffered_data = {buffered_data}")
 
         buffered_data_str: str = buffered_data.decode()
@@ -106,56 +109,27 @@ def _receive_client_input(sock_conn: socket.socket) -> None:
             logger.warning("Empty data received from client")
             break
 
-        client_input_cmd: str | list[str] = _decode_resp_to_string(buffered_data)
+        client_input_cmd: str | list[str] = _decode_resp_to_string(
+            resp_string=buffered_data
+            )
 
-        _ready_client_response(sock_conn, client_input_cmd)
+        await _ready_client_response(writer, client_input_cmd)
 
-
-def _ready_client_response(sock_conn: socket.socket, client_input_cmd: str | list[str]):
-
-    respsonse_data: str = ""
-    if isinstance(client_input_cmd, str):
-        respsonse_data = _redis_cmd_router(client_input_cmd)
-        # Write the same data back
-        sock_conn.sendall(_encode_string_as_resp2(respsonse_data))
-
-    else:
-        for cmd in client_input_cmd:
-            respsonse_data = _redis_cmd_router(cmd)
-            logger.debug(f"respsonse_data = {respsonse_data}")
-
-            # Write the same data back
-            sock_conn.sendall(_encode_string_as_resp2(respsonse_data))
+    writer.close()
+    await writer.wait_closed()
 
 
-def main():
-    # You can use print statements as follows for debugging, t
-    # hey'll be visible when running tests.
-    logger.info("Logs from your program will appear here!")
-    # logger.info("Logs from your program will appear here!")
-
-    # Uncomment this to pass the first stage
-    socket_address: tuple[str, int] = ("localhost", 6379)
-    # server_socket: socket.socket = socket.create_server(
-    #     address=socket_address,
-    #     reuse_port=True
-    #     )
-    # server_socket.accept()  # wait for client
-
-    with socket.create_server(
-            address=socket_address,
-            reuse_port=True
-            ) as server_socket:
-        # Block until we receive an incoming connection
-        connection, address = server_socket.accept()
-
-        print(f"accepted connection from {socket_address}")
-
-        # Read data
-        # data: bytes = connection.recv(1024)
-
-        _receive_client_input(sock_conn=connection)
+async def _init_socket_server(sock_add: tuple[str, int]) -> None:
+    server: asyncio.Server = await asyncio.start_server(
+        client_connected_cb=_receive_client_input,
+        host=sock_add[0],
+        port=sock_add[1]
+        )
+    async with server:
+        await server.serve_forever()
 
 
 if __name__ == "__main__":
-    main()
+    logger.basicConfig(level=logger.DEBUG)
+    sock_add = ("127.0.0.1", 6379)
+    asyncio.run(_init_socket_server(sock_add))
