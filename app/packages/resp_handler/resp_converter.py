@@ -28,10 +28,46 @@ def encode_to_resp2(inp: bytes | str) -> bytes:
         The encoded RESP2 string.
     """
     if isinstance(inp, str):
-        resp_inp: str = f"+{inp}\r\n"
-        return resp_inp.encode(encoding='utf-8')
+        if (
+            not inp.startswith(SIMPLE_STR_PREFIX.decode('utf-8'))
+            and
+            not inp.startswith(BULK_STR_PREFIX.decode('utf-8'))
+            and
+            not inp.startswith(BULK_ARRAY_PREFIX.decode('utf-8'))
+        ):
+            end_crlf_str: str = (
+                RESP_BASE_SEP.decode('utf-8')
+                if not inp.endswith(RESP_BASE_SEP.decode('utf-8'))
+                else ""
+            )
+            resp_inp: str = SIMPLE_STR_PREFIX.decode() \
+                + inp \
+                + end_crlf_str
+
+            return resp_inp.encode(encoding='utf-8')
+        else:
+            return inp.encode(encoding='utf-8')
+
     else:
-        return b'+' + inp
+        if (
+            not bytes(inp).startswith(SIMPLE_STR_PREFIX)
+            and
+            not bytes(inp).startswith(BULK_STR_PREFIX)
+            and
+            not bytes(inp).startswith(BULK_ARRAY_PREFIX)
+        ):
+            end_crlf: bytes = (
+                RESP_BASE_SEP if not bytes(inp).endswith(RESP_BASE_SEP)
+                else b''
+            )
+
+            resp_inp_bytes: bytes = SIMPLE_STR_PREFIX \
+                + inp \
+                + end_crlf
+
+            return resp_inp_bytes
+        else:
+            return inp
 
 
 def handle_simple_string_resp(resp_inp: bytes) -> bytes:
@@ -121,7 +157,6 @@ def handle_bulk_array_resp(resp_inp: bytes) -> list[bytes]:
 
     _consolidated_responses: list[bytes] = []
     _redis_cmd: bytes
-    _redis_cmd_str: str
 
     for idx in range(1, len(_commands)):
 
@@ -153,9 +188,13 @@ def handle_bulk_array_resp(resp_inp: bytes) -> list[bytes]:
                         # to skip the length of each field
                         pass
                     else:
-                        _redis_cmd_args += _commands[arg_idx]
+                        _redis_cmd_args = _redis_cmd_args + RESP_BASE_SEP \
+                            + _commands[arg_idx]
                 else:
                     break
+
+            logger.debug(f"_redis_cmd={_redis_cmd}")
+            logger.debug(f"_redis_cmd_args={_redis_cmd_args}")
 
             _consolidated_responses.append(
                 CMDROUTE.redis_arg_typ_cmd_router(

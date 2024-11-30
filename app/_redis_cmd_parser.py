@@ -15,7 +15,7 @@ def redis_client_inp_parser(data: bytes) -> bytes:
     elif isinstance(_response_to_client, list):
         _concat_response_to_client: bytes = b""
         for x in _response_to_client:
-            _concat_response_to_client: bytes = x+b"\r\n"
+            _concat_response_to_client: bytes = x + RESPENC.RESP_BASE_SEP
 
         logger.debug(f"_concat_response_to_client = {_concat_response_to_client}")  # noqa: E501
         return RESPENC.encode_to_resp2(_concat_response_to_client)
